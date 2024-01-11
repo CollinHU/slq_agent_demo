@@ -29,14 +29,18 @@ but name_search gives `orange` as the most similar noun then you should use `ora
 Otherwise, I can then look at the tables in the database to see what I can query.
 Then I should query the schema of the most relevant tables.
 """
-import openai
+
 #openai.api_base = "https://api.duckgpt.top/v1"
-openai.api_base ="https://api.chatanywhere.com.cn/v1"
+#openai.api_base ="https://api.chatanywhere.com.cn/v1"
+import os
+os.environ['OPENAI_API_BASE']='https://api.chatanywhere.tech/v1'
 
 #prepare vector store
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.schema import Document
+from langchain_openai import OpenAIEmbeddings
+
+#from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
+#from langchain.schema import Document
 from langchain.agents.agent_toolkits import create_retriever_tool
 
 def create_retriever_sim(openai_key):

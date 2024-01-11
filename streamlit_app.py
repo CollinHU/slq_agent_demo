@@ -2,7 +2,7 @@ import streamlit as st
 
 #from llama_index import VectorStoreIndex, ServiceContext, Document
 ##from llama_index.llms import OpenAI
-import openai
+#import openai
 #from llama_index import SimpleDirectoryReader
 
 st.set_page_config(page_title="Chat with the Streamlit docs, powered by LlamaIndex", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
@@ -20,8 +20,9 @@ def streaming_print(txt, markdown_placeholder):
     full_txt = ""
     for chunk in txt.split(" "):
         full_txt += chunk + " "
-        markdown_placeholder.markdown(full_txt)
+        markdown_placeholder.markdown(full_txt + "|")
         time.sleep(0.15)
+    markdown_placeholder.markdown(full_txt)
 
 def parsing_result(chunk, markdown_placeholder):
         full_response = ""
@@ -52,16 +53,19 @@ def parsing_result(chunk, markdown_placeholder):
 def load_data():
     import openai
     #openai.api_base = "https://api.duckgpt.top/v1"
-    openai.api_base = "https://api.chatanywhere.com.cn/v1"
+    import os
+    os.environ['OPENAI_API_BASE']='https://api.chatanywhere.tech/v1'
 
     from langchain.agents import create_sql_agent
-    from langchain.agents.agent_toolkits import SQLDatabaseToolkit
+    from langchain_community.agent_toolkits import SQLDatabaseToolkit
+    #from langchain.agents.agent_toolkits import SQLDatabaseToolkit
     from langchain.sql_database import SQLDatabase
-    from langchain.llms.openai import OpenAI
-    from langchain.agents import AgentExecutor
+    #from langchain.llms.openai import OpenAI
+    #from langchain.agents import AgentExecutor
     from langchain.agents.agent_types import AgentType
-    from langchain.chat_models import ChatOpenAI
-
+    #from langchain.chat_models import ChatOpenAI
+    from langchain_openai import ChatOpenAI
+    
     from common.utils import Utils
     from common.agent_utils import base_suffix, custom_suffix_filter, custom_suffix_sim
     from common.agent_utils import create_retriever_filter, create_retriever_sim
