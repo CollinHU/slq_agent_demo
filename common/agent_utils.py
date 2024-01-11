@@ -1,3 +1,5 @@
+SQL_SUFFIX_CUSTOM = """Begin!\n\nQuestion: {input}\n Thought: To answer this question, I need to search similar example first\n{agent_scratchpad}"""
+
 base_suffix = """
 You must use reponses from database to answer questions.
 if the answers contains multiple items, list them line by line. 
