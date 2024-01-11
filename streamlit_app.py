@@ -21,7 +21,7 @@ def streaming_print(txt, markdown_placeholder):
     for chunk in txt.split(" "):
         full_txt += chunk + " "
         markdown_placeholder.markdown(full_txt + "🐌")
-        time.sleep(0.1)
+        time.sleep(0.15)
     markdown_placeholder.markdown(full_txt)
 
 def parsing_result(chunk, markdown_placeholder):
@@ -38,7 +38,7 @@ def parsing_result(chunk, markdown_placeholder):
                 
                 if len(pure_thought) > 0:
                     response += f"**Thought**: {pure_thought}"
-                response += f"**Action**: ```{action.tool}``` with input ```{action.tool_input}```"
+                response += f"\n**Action**: ```{action.tool}``` with input ```{action.tool_input}```"
                 full_response += response + '\n'
                 streaming_print(response, markdown_placeholder)
                 #st.write(response)
@@ -88,7 +88,7 @@ def load_data():
         agent_compose = create_sql_agent(
             llm=llm,
             toolkit=toolkit,
-            verbose=False,
+            verbose=True,
             agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
             extra_tools=custom_tool_list_1 + custom_tool_list_2,
             suffix=custom_suffix_sim + custom_suffix_filter + base_suffix + SQL_SUFFIX_CUSTOM,

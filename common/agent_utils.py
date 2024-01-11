@@ -15,6 +15,8 @@ There are n employee whose name is xxx
 SELECT COUNT(*) from employee WHERE employee.name = xxx, 
 ```
 this query find the number of employee whose name is xxx.\n
+
+If after the action: sql_qeury the observation is empty, then if is no records found for users question.
 """
 
 custom_suffix_sim = """
@@ -48,7 +50,8 @@ from langchain.agents.agent_toolkits import create_retriever_tool
 def create_retriever_sim(openai_key):
     embeddings =  OpenAIEmbeddings(openai_api_key = openai_key)
     vectorDB_sim = FAISS.load_local("./data/similar_example_store_index", embeddings)
-    retriever_sim = vectorDB_sim.as_retriever()
+    retriever_sim = vectorDB_sim.as_retriever(search_type="similarity_score_threshold",
+                                              search_kwargs={'score_threshold': 0.7})
     tool_sim_des = """
     This tool will help you understand similar examples to adapt them to the user question.
     Input to this tool should be the user question.
