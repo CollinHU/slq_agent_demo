@@ -24,8 +24,8 @@ def streaming_print(txt, markdown_placeholder):
         time.sleep(0.15)
     markdown_placeholder.markdown(full_txt)
 
-def parsing_result(chunk, markdown_placeholder):
-        full_response = ""
+def parsing_result(chunk):
+        step_response = ""
         if "actions" in chunk:
             for action in chunk["actions"]:
 
@@ -39,25 +39,26 @@ def parsing_result(chunk, markdown_placeholder):
                 if len(pure_thought) > 0:
                     response += f"**Thought**: {pure_thought}"
                 response += f"\n**Action**: ```{action.tool}``` with input ```{action.tool_input}```"
-                full_response += response + '\n'
-                streaming_print(response, markdown_placeholder)
+                step_response += response + '\n'
+                #markdown_placeholder
+                #streaming_print(response, markdown_placeholder)
                 #st.write(response)
             # Observation
         elif "steps" in chunk:
             for step in chunk["steps"]:
                 response = f"**Observation**: ```{step.observation}```"
-                full_response += response + '\n'
+                step_response += response + '\n'
                 #st.write(response)
-                streaming_print(response, markdown_placeholder)
+                #streaming_print(response, markdown_placeholder)
             # Final result
         elif "output" in chunk:
             response = f"**Final Result**: {chunk['output']}"
-            full_response += response
-            streaming_print(response, markdown_placeholder)
+            step_response += response
+            #streaming_print(response, markdown_placeholder)
             #st.write(f"Final Result: {chunk['output']}")
         else:
             raise ValueError
-        return full_response
+        return step_response
 
 @st.cache_resource(show_spinner=False)
 def load_data():
@@ -114,13 +115,19 @@ if st.session_state.messages[-1]["role"] != "assistant":
         with st.spinner("Thinking..."):
             streaming_response = st.session_state.chat_engine.stream({'input': prompt})
             full_response = []
-            step_response = ""
+
+            markdown_placeholder = st.empty()
             for chunk in streaming_response:
                 #st.write(step_response)
-                markdown_placeholder = st.empty()
-                step_response = parsing_result(chunk, markdown_placeholder)
+                #markdown_placeholder = st.empty()
+                step_response = parsing_result(chunk)
                 full_response.append(step_response)
+                tem_txt = ""
+                for word in step_response.split(' '):
+                    tem_txt += word + ' '
+                    markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + tem_txt + "🐌")
+                    time.sleep(0.15)
                 #st.write(step_response)
-            #st.write(full_response)
+            markdown_placeholder.markdown('\n'.join(full_response))
             message = {"role": "assistant", "content": "\n".join(full_response)}
             st.session_state.messages.append(message) # Add response to message history
