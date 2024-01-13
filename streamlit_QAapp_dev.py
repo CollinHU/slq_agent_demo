@@ -142,14 +142,12 @@ st.markdown("""
 if st.session_state.messages[-1]["role"] != "user":
     with st.chat_message("user"):
         full_response =""
+        
         col1, col2, col3 = st.columns(3)
-
         with col1:
             voice_start = st.button('Start Voice')
-
         with col2:
             voice_end = st.button('End voice')
-
         with col3:
             send_record = st.button('Send Input')
 

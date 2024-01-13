@@ -1,3 +1,5 @@
 **/apps/tongyi
 **/__pycache__
-**/nls
+**/
+**/test
+**/common/utils.py
