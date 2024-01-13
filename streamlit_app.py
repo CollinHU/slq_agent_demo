@@ -24,8 +24,8 @@ def streaming_print(txt, markdown_placeholder):
         time.sleep(0.15)
     markdown_placeholder.markdown(full_txt)
 
-def parsing_result(chunk, markdown_placeholder):
-        full_response = ""
+def parsing_result(chunk):
+        step_response = ""
         if "actions" in chunk:
             for action in chunk["actions"]:
 
@@ -39,81 +39,67 @@ def parsing_result(chunk, markdown_placeholder):
                 if len(pure_thought) > 0:
                     response += f"**Thought**: {pure_thought}"
                 response += f"\n**Action**: ```{action.tool}``` with input ```{action.tool_input}```"
-                full_response += response + '\n'
-                streaming_print(response, markdown_placeholder)
+                step_response += response + '\n'
+                #markdown_placeholder
+                #streaming_print(response, markdown_placeholder)
                 #st.write(response)
             # Observation
         elif "steps" in chunk:
             for step in chunk["steps"]:
                 response = f"**Observation**: ```{step.observation}```"
-                full_response += response + '\n'
+                step_response += response + '\n'
                 #st.write(response)
-                streaming_print(response, markdown_placeholder)
+                #streaming_print(response, markdown_placeholder)
             # Final result
         elif "output" in chunk:
             response = f"**Final Result**: {chunk['output']}"
-            full_response += response
-            streaming_print(response, markdown_placeholder)
+            step_response += response
+            #streaming_print(response, markdown_placeholder)
             #st.write(f"Final Result: {chunk['output']}")
         else:
             raise ValueError
-        return full_response
+        return step_response
 
 @st.cache_resource(show_spinner=False)
 def load_data():
-    from langchain_community.llms import Tongyi
-    from common.utils import Utils
+    #import openai
+    #openai.api_base = "https://api.duckgpt.top/v1"
     import os
-    os.environ["DASHSCOPE_API_KEY"] = Utils.get_tongyi_key()
-    #llm = Tongyi(model_name= 'qwen-max-1201', temperature = 0)
-    from common.CustomLLM import QwenLLM
-    url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-    token = Utils.get_tongyi_key()
+    os.environ['OPENAI_API_BASE']='https://api.chatanywhere.tech/v1'
 
-    qwen = QwenLLM(url= url, model='qwen-max-1201', token=token, temperature=0.2)
-    from langchain.embeddings import HuggingFaceBgeEmbeddings
-    model_name = "BAAI/bge-base-en-v1.5"
-
-    encode_kwargs = {'normalize_embeddings' : True}
-    embedding_model = HuggingFaceBgeEmbeddings(
-        model_name = model_name,
-        encode_kwargs = encode_kwargs,
-        query_instruction = "Represent this sentence for searching relevant passages:"
-    )
-
-    from llama_index import VectorStoreIndex, SimpleDirectoryReader
-    from llama_index.tools import QueryEngineTool, ToolMetadata
-    from llama_index.query_engine.sub_question_query_engine import SubQuestionQueryEngineCustom
-    from llama_index.callbacks import CallbackManager, LlamaDebugHandler
-    from llama_index import ServiceContext
-    service_context = ServiceContext.from_defaults(llm = qwen, embed_model = embedding_model)
+    from langchain.agents import create_sql_agent
+    from langchain_community.agent_toolkits import SQLDatabaseToolkit
+    #from langchain.agents.agent_toolkits import SQLDatabaseToolkit
+    from langchain.sql_database import SQLDatabase
+    #from langchain.llms.openai import OpenAI
+    #from langchain.agents import AgentExecutor
+    from langchain.agents.agent_types import AgentType
+    #from langchain.chat_models import ChatOpenAI
+    from langchain_openai import ChatOpenAI
+    
+    from common.utils import Utils
+    from common.agent_utils import base_suffix, custom_suffix_filter, custom_suffix_sim, SQL_SUFFIX_CUSTOM
+    from common.agent_utils import create_retriever_filter, create_retriever_sim
     with st.spinner(text="Loading and indexing the Streamlit docs – hang tight! This should take 1-2 minutes."):
-        from llama_index import StorageContext, load_index_from_storage
-
-        storage_dbs_doc = StorageContext.from_defaults(persist_dir = './data/subquery/dbs')
-        storage_dbs_index = load_index_from_storage(storage_dbs_doc, service_context=service_context)
-        query_engine_tools = [
-            QueryEngineTool(
-                query_engine=storage_dbs_index.as_query_engine(),
-                metadata=ToolMetadata(
-                    name="DBS Holdings plc Annual Report and Accounts 2022",
-                    description="Provide information about DBS Group Holdings Ltd financials for year 2022",
-                ),
-            ),
-        ]
-
-        query_engine = SubQuestionQueryEngineCustom.from_defaults(
-            query_engine_tools=query_engine_tools,
-            service_context=service_context,
+        db = SQLDatabase.from_uri('postgresql+psycopg2://flowise:flowise@localhost/metastore')
+        llm = ChatOpenAI(model='gpt-4-1106-preview', temperature=0, openai_api_key = Utils.get_openai_key())
+        toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+        custom_tool_list_1 = [ create_retriever_sim(openai_key=Utils.get_openai_key())]
+        custom_tool_list_2 = [ create_retriever_filter(opai_key=Utils.get_openai_key())]
+        agent_compose = create_sql_agent(
+            llm=llm,
+            toolkit=toolkit,
             verbose=True,
-            use_async=False,
+            agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            extra_tools=custom_tool_list_1 + custom_tool_list_2,
+            suffix=custom_suffix_sim + custom_suffix_filter + base_suffix + SQL_SUFFIX_CUSTOM,
         )
-        return query_engine
+        return agent_compose
 
-query_engine = load_data()
+sql_agent = load_data()
 
 if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
-        st.session_state.chat_engine = query_engine
+        st.session_state.chat_engine = sql_agent
 
 if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -127,19 +113,21 @@ for message in st.session_state.messages: # Display the prior chat messages
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            streaming_response = query_engine.query(prompt + ". if applicable, give the final result in markdown table format")
+            streaming_response = st.session_state.chat_engine.stream({'input': prompt})
             full_response = []
-            step_response = ""
+
+            markdown_placeholder = st.empty()
             for chunk in streaming_response:
                 #st.write(step_response)
-                if not isinstance(chunk, str):
-                    print('ss')
-                    chunk = f"**Final Answer**: {chunk.response}"
-                chunk = chunk.replace('$', '')
-                markdown_placeholder = st.empty()
-                streaming_print(chunk, markdown_placeholder)
-                full_response.append(chunk)
+                #markdown_placeholder = st.empty()
+                step_response = parsing_result(chunk)
+                full_response.append(step_response)
+                tem_txt = ""
+                for word in step_response.split(' '):
+                    tem_txt += word + ' '
+                    markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + tem_txt + "🐌")
+                    time.sleep(0.15)
                 #st.write(step_response)
-            #st.write(full_response)
+            markdown_placeholder.markdown('\n'.join(full_response))
             message = {"role": "assistant", "content": "\n".join(full_response)}
             st.session_state.messages.append(message) # Add response to message history
