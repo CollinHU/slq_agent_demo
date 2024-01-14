@@ -51,7 +51,7 @@ def load_data():
         #from llama_index import VectorStoreIndex, SimpleDirectoryReader
         from llama_index.tools import QueryEngineTool, ToolMetadata
         from llama_index.query_engine.sub_question_query_engine import SubQuestionQueryEngineCustom
-        from llama_index.callbacks import CallbackManager, LlamaDebugHandler
+        #from llama_index.callbacks import CallbackManager, LlamaDebugHandler
         from llama_index import ServiceContext
         service_context = ServiceContext.from_defaults(llm = qwen, embed_model = embedding_model)
     #with st.spinner(text="Loading and indexing the Streamlit docs – hang tight! This should take 1-2 minutes."):
@@ -103,7 +103,9 @@ for message in st.session_state.messages: # Display the prior chat messages
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            streaming_response = query_engine.query(flag[4] + ". if applicable, give the final result in markdown table format")
+            requirements_prompt = """\n If applicable, give the final result in markdown table format.
+            if user asked question in Chinese, please also generate the final answer in Chinese when generating the final answer."""
+            streaming_response = query_engine.query(flag[4] + requirements_prompt)
             full_response = []
             markdown_placeholder = st.empty()
             for chunk in streaming_response:
@@ -143,16 +145,16 @@ if st.session_state.messages[-1]["role"] != "user":
     with st.chat_message("user"):
         full_response =""
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            voice_start = st.button('Start Voice')
+            voice_start = st.button('Microphone Button')
+        #with col2:
+        #    voice_end = st.button('End voice')
         with col2:
-            voice_end = st.button('End voice')
-        with col3:
             send_record = st.button('Send Input')
 
         #print(f'step 0 {voice_start, voice_end}')
-        with st.spinner("Inputing..."):
+        with st.spinner("Voice Inputing..."):
             #voice_start = st.button('microphone')
             #print(f'step 1 {voice_start, voice_end, flag[4]}')
             markdown_placeholder = st.empty()
@@ -166,25 +168,34 @@ if st.session_state.messages[-1]["role"] != "user":
             t = TestSt(0, flag[3], messages)
 
             if voice_start:
-                print('---voice start---')
-                flag[3].clear()
-                flag[1] = True
-            if voice_end:
-                flag[3].set()
-                time.sleep(0.5)
-                print('---voice end---')
-                flag[1] = False
-                flag[0] = 0
+                if not flag[1]:
+                    print('---voice start---')
+                    flag[3].clear()
+                    flag[1] = True
+                else:
+                    flag[3].set()
+                    time.sleep(0.5)
+                    print('---voice end---')
+                    flag[1] = False
+                    flag[0] = 0
+            #if voice_end:
+            #    flag[3].set()
+            #    time.sleep(0.5)
+            #    print('---voice end---')
+            #    flag[1] = False
+            #    flag[0] = 0
             
             while flag[1]:
                 if flag[0] == 0:
                     print('***start thread***')
                     #print(f'voice_start 3 {voice_start, voice_end}')
                     flag[0] = 1
+                    flag[4] = ""
+                    flag[5] = ['']
                     start = time.time()
                     msg_len = len(messages)
                     t.start()
-                if time.time() - start > 10:
+                if time.time() - start > 60:
                     flag[3].set()
                     flag[0] = 0
                     #flag[4] += ''.join([chunk['sentence'] for chunk in messages if chunk.get('sentence')])
@@ -192,7 +203,7 @@ if st.session_state.messages[-1]["role"] != "user":
                     print('time out')
                     flag[1] = False
                     break
-                time.sleep(0.15)
+                time.sleep(0.1)
                 if len(messages) > msg_len:
                     msg_len = len(messages)
                     chunck = messages[-1]

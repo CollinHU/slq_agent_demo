@@ -6,17 +6,15 @@ import nls
 import pyaudio
 import json
  
-from utils.Utils import get_alibaba_voice_recognition_token, get_alibaba_voice_recognition_appKey
+from common.utils import Utils
 #mic = None
 #stream = None
 
 URL="wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
-TOKEN=get_alibaba_voice_recognition_token()  #参考https://help.aliyun.com/document_detail/450255.html获取token
-APPKEY=get_alibaba_voice_recognition_appKey()    #获取Appkey请前往控制台：https://nls-portal.console.aliyun.com/applist
+TOKEN=Utils.get_alibaba_voice_recognition_token()  #参考https://help.aliyun.com/document_detail/450255.html获取token
+APPKEY=Utils.get_alibaba_voice_recognition_appKey()    #获取Appkey请前往控制台：https://nls-portal.console.aliyun.com/applist
 
-#messages = []
-def print_text(txt):
-    print(f'test {txt}')
+
 #以下代码会根据音频文件内容反复进行实时语音识别（文件转写）
 class TestSt:
     def __init__(self, tid, event, messages):
