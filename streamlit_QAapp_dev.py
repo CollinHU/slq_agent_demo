@@ -103,8 +103,9 @@ for message in st.session_state.messages: # Display the prior chat messages
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            requirements_prompt = """\n If applicable, give the final result in markdown table format.
-            if user asked question in Chinese, please also generate the final answer in Chinese when generating the final answer."""
+            requirements_prompt = ""
+            #"""\n If applicable, give the final result in markdown table format.
+            #if user asked question in Chinese, please also generate the final answer in Chinese when generating the final answer."""
             streaming_response = query_engine.query(flag[4] + requirements_prompt)
             full_response = []
             markdown_placeholder = st.empty()
@@ -174,7 +175,7 @@ if st.session_state.messages[-1]["role"] != "user":
                     flag[1] = True
                 else:
                     flag[3].set()
-                    time.sleep(0.5)
+                    time.sleep(0.1)
                     print('---voice end---')
                     flag[1] = False
                     flag[0] = 0
