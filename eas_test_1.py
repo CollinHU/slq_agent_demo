@@ -8,7 +8,7 @@ import requests
 import gradio as gr
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
-from fastapi.response import JSONResponse
+from fastapi.responses import JSONResponse
 
 JSONObject = Dict[str, Any]
 JSONArray = List[Any]
@@ -49,14 +49,14 @@ else:
             model_path += '/' + snap_shots_list[0]
 
 if task == 'chat':
-    import webui_server
-    webui_server.main()
+    print('test')
 else :
 
-    from transformers import AutoTokenizer, AutoModel
+    from modelscope import AutoTokenizer, AutoModel
     import torch
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    print(device)
     # Sentences we want sentence embeddings for
     #sentences = ["样例数据-1", "样例数据-2"]
 
