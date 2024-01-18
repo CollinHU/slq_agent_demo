@@ -54,13 +54,13 @@ else :
     import torch
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    print(device)
+    print("Which device we are using", device)
     # Sentences we want sentence embeddings for
     #sentences = ["样例数据-1", "样例数据-2"]
 
     # Load model from HuggingFace Hub
-    tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-large-zh-v1.5')
-    model = AutoModel.from_pretrained('BAAI/bge-large-zh-v1.5')
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModel.from_pretrained(model_path)
     model.to(device)
     model.eval()
 
