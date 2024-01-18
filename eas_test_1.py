@@ -4,8 +4,6 @@ from typing import Any, Dict, List, Union
 
 from transformers import pipeline
 
-import requests
-import gradio as gr
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
 from fastapi.responses import JSONResponse
