@@ -89,10 +89,10 @@ else :
             # normalize embeddings
             sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1)
             response_data = {'data':sentence_embeddings.tolist()}
-        except:
-            raise HTTPException(status_code=500, detail='Internal Server Error')
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f'Internal Server Error: {e}')
         #print("Sentence embeddings:", sentence_embeddings)
         return JSONResponse(content=response_data)
 
-    app = gr.mount_gradio_app(redirect_app, ss, path="/")
-    uvicorn.run(app=app, host=host, port=port)
+    #app = gr.mount_gradio_app(redirect_app, ss, path="/")
+    uvicorn.run(app= redirect_app , host=host, port=port)
