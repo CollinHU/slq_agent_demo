@@ -103,31 +103,37 @@ for message in st.session_state.messages: # Display the prior chat messages
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            requirements_prompt = ""
-            #"""\n If applicable, give the final result in markdown table format.
-            #if user asked question in Chinese, please also generate the final answer in Chinese when generating the final answer."""
-            streaming_response = query_engine.query(flag[4] + requirements_prompt)
-            full_response = []
-            markdown_placeholder = st.empty()
-            for chunk in streaming_response:
-                #st.write(step_response)
-                if not isinstance(chunk, str):
-                    chunk = f"**Final Answer**: {chunk.response}"
-                chunk = chunk.replace('$', '')
-                #streaming_print(chunk, markdown_placeholder)
-                full_response.append(chunk)
-                step_response = ""
-                for word in chunk.split(" "):
-                    step_response += word + " "
-                    markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + step_response + "🐌")
-                    time.sleep(0.15)
-            markdown_placeholder.markdown('\n'.join(full_response))
+            #\nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese.
+            #If user asked question in English, you should generate English query in English then give the final answer in English.
+            requirements_prompt = """
+            \n If applicable, give a table listing metric and other in text when giving the final result. You final answer should be the same language as the question
+            \nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese."""
+            try:
+                streaming_response = query_engine.query(flag[4] + requirements_prompt)
+                full_response = []
+                markdown_placeholder = st.empty()
+                for chunk in streaming_response:
+                    #st.write(step_response)
+                    if not isinstance(chunk, str):
+                        chunk = f"**Final Answer**: {chunk.response}"
+                    chunk = chunk.replace('$', '\$')
+                    #streaming_print(chunk, markdown_placeholder)
+                    full_response.append(chunk)
+                    step_response = ""
+                    for word in chunk.split(" "):
+                        step_response += word + " "
+                        markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + step_response + "🐌")
+                        time.sleep(0.15)
+            except Exception as e:
+                print(f'error {e}')
+                full_response = ["Your question is not clear, please re-orgonize your question again"]
                 #st.write(step_response)
             #st.write(full_response)
+            markdown_placeholder.markdown('\n'.join(full_response))
             flag[4] = ""
             flag[5] = ['']
-            time.sleep(2)
-            markdown_placeholder.markdown("\n".join(full_response))
+            #time.sleep(2)
+            #markdown_placeholder.markdown("\n".join(full_response))
             message = {"role": "assistant", "content": "\n".join(full_response)}
             st.session_state.messages.append(message) # Add response to message history
 
