@@ -35,14 +35,12 @@ def load_data():
         import os
         os.environ["DASHSCOPE_API_KEY"] = Utils.get_tongyi_key()
         #llm = Tongyi(model_name= 'qwen-max-1201', temperature = 0)
-        from common.CustomLLM import QwenLLM
-        url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-        token = Utils.get_tongyi_key()
+        from langchain_community.llms import Tongyi
+        qwen = Tongyi()
 
-        qwen = QwenLLM(url= url, model='qwen-max-1201', token=token, temperature=0)
         from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
         model_name = "BAAI/bge-base-en-v1.5"
-
         encode_kwargs = {'normalize_embeddings' : True}
         embedding_model = HuggingFaceBgeEmbeddings(
             model_name = model_name,
@@ -50,35 +48,16 @@ def load_data():
             query_instruction = "Represent this sentence for searching relevant passages:"
         )
 
-        #from llama_index import VectorStoreIndex, SimpleDirectoryReader
-        
-        from llama_index.core.tools import QueryEngineTool, ToolMetadata
-
-        from llama_index.core.query_engine import SubQuestionQueryEngine
-        #from llama_index.callbacks import CallbackManager, LlamaDebugHandler
         from llama_index.core import Settings
         Settings.llm = qwen
         Settings.embed_model = embedding_model
 
+    #with st.spinner(text="Loading and indexing the Streamlit docs – hang tight! This should take 1-2 minutes."):
         from llama_index.core import StorageContext, load_index_from_storage
 
         storage_dbs_doc = StorageContext.from_defaults(persist_dir = './data/subquery/dbs')
         storage_dbs_index = load_index_from_storage(storage_dbs_doc)
-        query_engine_tools = [
-            QueryEngineTool(
-                query_engine=storage_dbs_index.as_query_engine(),
-                metadata=ToolMetadata(
-                    name="DBS Holdings plc Annual Report and Accounts 2022",
-                    description="Provide information about DBS Group Holdings Ltd financials for year 2022",
-                ),
-            ),
-        ]
-
-        query_engine = SubQuestionQueryEngine.from_defaults(
-            query_engine_tools=query_engine_tools,
-            verbose=True,
-            use_async=False,
-        )
+        query_engine = storage_dbs_index.as_query_engine(streaming = True)
         return query_engine
 
 @st.cache_resource
@@ -96,76 +75,39 @@ if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
 if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
     flag[4] += prompt
     st.session_state.messages.append({"role": "user", "content":flag[4]})
-    #service_parameters = {
-    #        'content': "how to kill others",
-    #        'dataId': str(uuid.uuid1())
-    #    }
-    #result = TextAutoRoute.main(service_parameters)
-    #if result.data.result[0].label != 'nonLabel':
-    #    if len(result.data.advice) == 0:
-    #        st.session_state.messages.append({"role": "assistant", "content":'Your Input Contains Inproper Content'})
-    #    else:
-    #        st.session_state.messages.append({"role": "assistant", "content":result.data.advice})
-
 
 for message in st.session_state.messages: # Display the prior chat messages
     with st.chat_message(message["role"]):
         #if message['role'] == 'user':
-        st.write(message["content"])
+        st.markdown(message["content"])
 
 # If last message is not from assistant, generate a new response
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
-        service_parameters = {
-                'content': flag[4],
-                'dataId': str(uuid.uuid1())
-            }
-        result = TextAutoRoute.main(service_parameters)
-        if result.data.result[0].label != 'nonLabel' or 'blackmail' in flag[4]:
-            flag[4] = ""
-            print('ssssss')
-            if len(result.data.advice) == 0:
-                message = {"role": "assistant", "content":'Data Inspection Failed, Input data may contain inappropriate content.'}
-            else:
-                message = {"role": "assistant", "content":result.data.advice}
-            #time.sleep(1)
-            st.markdown(message["content"])
-
-        else:
-
-            with st.spinner("Thinking..."):
-                #\nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese.
-                #If user asked question in English, you should generate English query in English then give the final answer in English.
-                requirements_prompt = """
-                If applicable, give a table listing metrics giving the final result.
-                """
-                try:
-                    streaming_response = query_engine.query(flag[4] + requirements_prompt)
-                    full_response = []
-                    markdown_placeholder = st.empty()
-                    for chunk in streaming_response:
-                        #st.write(step_response)
-                        if not isinstance(chunk, str):
-                            chunk = f"**Final Answer**: {chunk.response}"
-                        chunk = chunk.replace('$', '\$')
-                        #streaming_print(chunk, markdown_placeholder)
-                        full_response.append(chunk)
-                        step_response = ""
-                        for word in chunk.split(" "):
-                            step_response += word + " "
-                            markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + step_response + "🐌")
-                            time.sleep(0.15)
-                except Exception as e:
-                    print(f'error {e}')
-                    full_response = ["Your question is not clear, please re-orgonize your question again"]
-                    #st.write(step_response)
-                #st.write(full_response)
-                markdown_placeholder.markdown('\n'.join(full_response))
-                flag[4] = ""
-                flag[5] = ['']
-                #time.sleep(2)
-                #markdown_placeholder.markdown("\n".join(full_response))
-                message = {"role": "assistant", "content": "\n".join(full_response)}
+        #\nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese.
+        #If user asked question in English, you should generate English query in English then give the final answer in English.
+        try:
+            streaming_response = query_engine.query(flag[4])
+            full_response = ""
+            markdown_placeholder = st.empty()
+            for chunk in streaming_response.response_gen:
+                #st.write(step_response)
+                if not isinstance(chunk, str):
+                    chunk = f"**Final Answer**: {chunk.response}"
+                chunk = chunk.replace('$', '\$')
+                #streaming_print(chunk, markdown_placeholder)
+                full_response += chunk
+                markdown_placeholder.markdown(full_response + "✍️")
+                time.sleep(0.15)
+        except Exception as e:
+            print(f'error {e}')
+            full_response = "Your question is not clear, please re-orgonize your question again"
+            #st.write(step_response)
+        markdown_placeholder.markdown(full_response)
+        flag[4] = ""
+        flag[5] = ['']
+        #time.sleep(2)
+        message = {"role": "assistant", "content": full_response}
         st.session_state.messages.append(message) # Add response to message history
 
 st.markdown("""

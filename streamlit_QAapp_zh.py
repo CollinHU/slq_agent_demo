@@ -1,12 +1,10 @@
 import streamlit as st
-import uuid
 import threading
 from common.realtime_record import TestSt
 #from llama_index import VectorStoreIndex, ServiceContext, Document
 ##from llama_index.llms import OpenAI
 #import openai
 #from llama_index import SimpleDirectoryReader
-from alibaba_sdk.alibaba_text_moderation import TextAutoRoute
 
 st.set_page_config(page_title="Chat with the Streamlit docs, powered by LlamaIndex", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
 #openai.api_key = st.secrets.openai_key
@@ -15,7 +13,7 @@ st.info("Check out the full tutorial to build this app in our [blog post](https:
          
 if "messages" not in st.session_state.keys(): # Initialize the chat messages history
     st.session_state.messages = [
-        {"role": "assistant", "content": "Ask me a question about DBS annual report in 2022!"}
+        {"role": "assistant", "content": "Ask me a question about HSBC annual report in 2022!"}
     ]
 
 import time
@@ -39,47 +37,32 @@ def load_data():
         url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
         token = Utils.get_tongyi_key()
 
-        qwen = QwenLLM(url= url, model='qwen-max-1201', token=token, temperature=0)
+        qwen = QwenLLM(url= url, model='qwen-max-1201', token=token, temperature=0.15)
+        #from langchain.embeddings import HuggingFaceBgeEmbeddings
         from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-        model_name = "BAAI/bge-base-en-v1.5"
+        model_name = "/Users/collin/.cache/modelscope/hub/AI-ModelScope/bge-base-zh-v1.5"
 
         encode_kwargs = {'normalize_embeddings' : True}
         embedding_model = HuggingFaceBgeEmbeddings(
             model_name = model_name,
             encode_kwargs = encode_kwargs,
-            query_instruction = "Represent this sentence for searching relevant passages:"
+            query_instruction = "为这个句子生成表示用于检索相关文章：",
         )
+        from llama_index import ServiceContext
+        from llama_index import StorageContext, load_index_from_storage
 
-        #from llama_index import VectorStoreIndex, SimpleDirectoryReader
-        
-        from llama_index.core.tools import QueryEngineTool, ToolMetadata
+        #print('test1')
+        service_context = ServiceContext.from_defaults(llm = qwen, embed_model = embedding_model)
+        storage_dbs_doc = StorageContext.from_defaults(persist_dir = './data/subquery/hsbc')
+        storage_dbs_index = load_index_from_storage(storage_dbs_doc, service_context=service_context)
+        v_db_retriever = storage_dbs_index.as_retriever()
+        #print('test2')
+        from common.SubQuestionEngine import SubQuestionQueryEngine
 
-        from llama_index.core.query_engine import SubQuestionQueryEngine
-        #from llama_index.callbacks import CallbackManager, LlamaDebugHandler
-        from llama_index.core import Settings
-        Settings.llm = qwen
-        Settings.embed_model = embedding_model
-
-        from llama_index.core import StorageContext, load_index_from_storage
-
-        storage_dbs_doc = StorageContext.from_defaults(persist_dir = './data/subquery/dbs')
-        storage_dbs_index = load_index_from_storage(storage_dbs_doc)
-        query_engine_tools = [
-            QueryEngineTool(
-                query_engine=storage_dbs_index.as_query_engine(),
-                metadata=ToolMetadata(
-                    name="DBS Holdings plc Annual Report and Accounts 2022",
-                    description="Provide information about DBS Group Holdings Ltd financials for year 2022",
-                ),
-            ),
-        ]
-
-        query_engine = SubQuestionQueryEngine.from_defaults(
-            query_engine_tools=query_engine_tools,
-            verbose=True,
-            use_async=False,
-        )
-        return query_engine
+        doc_des = '匯豐控股公司2022年報及帳目'
+        qwen = QwenLLM(url= url, model='qwen-max-1201', token=token, temperature=0.2)
+        qa_chatbot = SubQuestionQueryEngine(retriever=v_db_retriever, doc_des=doc_des, llm=qwen)
+        return qa_chatbot
 
 @st.cache_resource
 def return_flag():
@@ -96,16 +79,6 @@ if "chat_engine" not in st.session_state.keys(): # Initialize the chat engine
 if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
     flag[4] += prompt
     st.session_state.messages.append({"role": "user", "content":flag[4]})
-    #service_parameters = {
-    #        'content': "how to kill others",
-    #        'dataId': str(uuid.uuid1())
-    #    }
-    #result = TextAutoRoute.main(service_parameters)
-    #if result.data.result[0].label != 'nonLabel':
-    #    if len(result.data.advice) == 0:
-    #        st.session_state.messages.append({"role": "assistant", "content":'Your Input Contains Inproper Content'})
-    #    else:
-    #        st.session_state.messages.append({"role": "assistant", "content":result.data.advice})
 
 
 for message in st.session_state.messages: # Display the prior chat messages
@@ -116,57 +89,40 @@ for message in st.session_state.messages: # Display the prior chat messages
 # If last message is not from assistant, generate a new response
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
-        service_parameters = {
-                'content': flag[4],
-                'dataId': str(uuid.uuid1())
-            }
-        result = TextAutoRoute.main(service_parameters)
-        if result.data.result[0].label != 'nonLabel' or 'blackmail' in flag[4]:
-            flag[4] = ""
-            print('ssssss')
-            if len(result.data.advice) == 0:
-                message = {"role": "assistant", "content":'Data Inspection Failed, Input data may contain inappropriate content.'}
-            else:
-                message = {"role": "assistant", "content":result.data.advice}
-            #time.sleep(1)
-            st.markdown(message["content"])
-
-        else:
-
-            with st.spinner("Thinking..."):
-                #\nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese.
-                #If user asked question in English, you should generate English query in English then give the final answer in English.
-                requirements_prompt = """
-                If applicable, give a table listing metrics giving the final result.
-                """
-                try:
-                    streaming_response = query_engine.query(flag[4] + requirements_prompt)
-                    full_response = []
-                    markdown_placeholder = st.empty()
-                    for chunk in streaming_response:
-                        #st.write(step_response)
-                        if not isinstance(chunk, str):
-                            chunk = f"**Final Answer**: {chunk.response}"
-                        chunk = chunk.replace('$', '\$')
-                        #streaming_print(chunk, markdown_placeholder)
-                        full_response.append(chunk)
-                        step_response = ""
-                        for word in chunk.split(" "):
-                            step_response += word + " "
-                            markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + step_response + "🐌")
-                            time.sleep(0.15)
-                except Exception as e:
-                    print(f'error {e}')
-                    full_response = ["Your question is not clear, please re-orgonize your question again"]
+        with st.spinner("Thinking..."):
+            #\nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese.
+            #If user asked question in English, you should generate English query in English then give the final answer in English.
+            requirements_prompt = """
+            \n If applicable, give a table listing metric and other in text when giving the final result. You final answer should be the same language as the question
+            \nIf user asked question in Chinese, you should generate query in English then give the final answer in Chinese."""
+            try:
+                streaming_response = query_engine.query(flag[4])
+                full_response = []
+                markdown_placeholder = st.empty()
+                for chunk in streaming_response:
                     #st.write(step_response)
-                #st.write(full_response)
-                markdown_placeholder.markdown('\n'.join(full_response))
-                flag[4] = ""
-                flag[5] = ['']
-                #time.sleep(2)
-                #markdown_placeholder.markdown("\n".join(full_response))
-                message = {"role": "assistant", "content": "\n".join(full_response)}
-        st.session_state.messages.append(message) # Add response to message history
+                    if not isinstance(chunk, str):
+                        chunk = f"**Final Answer**: {chunk.response}"
+                    chunk = chunk.replace('$', '\$')
+                    #streaming_print(chunk, markdown_placeholder)
+                    full_response.append(chunk)
+                    step_response = ""
+                    for word in chunk.split(" "):
+                        step_response += word + " "
+                        markdown_placeholder.markdown('\n'.join(full_response[:-1]) + '\n' + step_response + "🐌")
+                        time.sleep(0.1)
+            except Exception as e:
+                print(f'error {e}')
+                full_response = ["Your question is not clear, please re-orgonize your question again"]
+                #st.write(step_response)
+            #st.write(full_response)
+            markdown_placeholder.markdown('\n'.join(full_response))
+            flag[4] = ""
+            flag[5] = ['']
+            #time.sleep(2)
+            #markdown_placeholder.markdown("\n".join(full_response))
+            message = {"role": "assistant", "content": "\n".join(full_response)}
+            st.session_state.messages.append(message) # Add response to message history
 
 st.markdown("""
             <style>
