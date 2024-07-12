@@ -11,18 +11,20 @@ from common.utils import Utils
 #stream = None
 
 URL="wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
-TOKEN=Utils.get_alibaba_voice_recognition_token()  #参考https://help.aliyun.com/document_detail/450255.html获取token
-APPKEY=Utils.get_alibaba_voice_recognition_appKey()    #获取Appkey请前往控制台：https://nls-portal.console.aliyun.com/applist
+#TOKEN=Utils.get_alibaba_voice_recognition_token()  #参考https://help.aliyun.com/document_detail/450255.html获取token
+#APPKEY=Utils.get_alibaba_voice_recognition_appKey()    #获取Appkey请前往控制台：https://nls-portal.console.aliyun.com/applist
 
 
 #以下代码会根据音频文件内容反复进行实时语音识别（文件转写）
 class TestSt:
-    def __init__(self, tid, event, messages):
+    def __init__(self, tid, event, messages, TOKEN, APPKEY):
         self.__th = threading.Thread(target=self.__test_run, args=(event,))
         self.__id = tid
         self.__mic = None
         self.__stream = None
         self.messages = messages
+        self.TOKEN = TOKEN
+        self.APPKEY = APPKEY
         #self.__stop_event = event
     
     def start(self):
@@ -74,8 +76,8 @@ class TestSt:
         print("thread:{} start..".format(self.__id))
         sr = nls.NlsSpeechTranscriber(
                     url=URL,
-                    token=TOKEN,
-                    appkey=APPKEY,
+                    token=self.TOKEN,
+                    appkey=self.APPKEY,
                     on_sentence_begin=self.test_on_sentence_begin,
                     on_sentence_end=self.test_on_sentence_end,
                     on_start=self.test_on_start,
